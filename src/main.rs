@@ -40,6 +40,7 @@ struct Options {
     silent: bool,
     directories: Vec<String>,
     print_stats: bool,
+    print0: bool,
 }
 
 fn traverse(options: Options) {
@@ -112,7 +113,21 @@ fn traverse(options: Options) {
                             other_count += 1;
                         }
                     }
-                } else {
+                } else if options.print0 {
+                    for entry in results {
+                        let path = entry.path();
+
+                        if path.is_file() {
+                            file_count += 1;
+                        } else if path.is_dir() {
+                            dir_count += 1;
+                        } else {
+                            other_count += 1;
+                        }
+
+                        print!("{}\x00", entry.path().display());
+                    }
+                } else  {
                     for entry in results {
                         let path = entry.path();
 
@@ -128,8 +143,14 @@ fn traverse(options: Options) {
                     }
                 }
             } else if !options.silent {
-                for entry in results {
-                    println!("{}", entry.path().display());
+                if options.print0 {
+                    for entry in results {
+                        print!("{}\0", entry.path().display());
+                    }
+                } else {
+                    for entry in results {
+                        println!("{}", entry.path().display());
+                    }
                 }
             }
         }
@@ -404,6 +425,13 @@ and is primarily here for debugging or benchmarking. A more efficient
 method to do this will be implemented in the future.")
             )
 
+        .arg(Arg::new("print0")
+            .long("print0")
+            .short('0')
+            .action(ArgAction::SetTrue)
+            .help("Separate filenames with null characters instead of newlines")
+        )
+
         .arg(Arg::new("directories")
             .default_value(".")
             .num_args(1..)
@@ -469,6 +497,7 @@ method to do this will be implemented in the future.")
         depth: *matches.get_one("depth").unwrap_or(&0),
         directories: walk_dirs,
         print_stats: *matches.get_one("stats").unwrap_or(&false),
+        print0: *matches.get_one("print0").unwrap_or(&false),
     };
 
     if let Some(algorithm) = &options.checksum {
